@@ -1,0 +1,7 @@
+{
+  "config": {
+    "subset_size": 3900
+  },
+  "n_documents": 31920,
+  "n_queries": 3900
+}

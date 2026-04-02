@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+outputs/
+
+# Local env files
+.env
+.venv/
+venv/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Keep cache tracked for the small demo profile in this repo.
+# If you switch back to the full heavy run (subset=50,000),
+# uncomment the next line to avoid pushing huge artifacts.
+# cache/

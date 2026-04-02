@@ -1,0 +1,6 @@
+{
+  "num_documents": 31920,
+  "embedding_dim": 384,
+  "hnsw_m": 32,
+  "metric": "inner_product"
+}

@@ -302,3 +302,4 @@ Important:
 ## 14) One-Line Project Summary
 
 We built and analyzed a semantic search system using dense retrieval, compared it with lexical BM25, and introduced a hybrid ranker with evaluation across retrieval depth, query types, and ANN-vs-Exact performance, delivered through an interactive Streamlit app.
+URL For the hosted application : https://sementicsearchengine.streamlit.app/

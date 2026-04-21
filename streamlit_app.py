@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from hnsw_search_engine import CustomHNSWSearchEngine
 from retrieval_engine import SearchConfig, SemanticSearchEngine
 
 
@@ -35,14 +36,23 @@ def get_engine() -> SemanticSearchEngine:
     return SemanticSearchEngine(config).load_or_build()
 
 
+@st.cache_resource(show_spinner=False)
+def get_hnsw_engine(_base_engine: SemanticSearchEngine) -> CustomHNSWSearchEngine:
+    return CustomHNSWSearchEngine.from_base_engine(_base_engine)
+
+
 def run_selected_search(
     engine: SemanticSearchEngine,
+    hnsw_engine: CustomHNSWSearchEngine,
     model_name: str,
+    dense_backend: str,
     query: str,
     top_k: int,
     alpha: float,
 ):
-    if model_name == "BERT":
+    if model_name == "Dense":
+        if dense_backend == "HNSW":
+            return hnsw_engine.hnsw_search(query, k=top_k)
         return engine.semantic_search(query, k=top_k, use_exact=False)
     if model_name == "BM25":
         return engine.bm25_search(query, k=top_k)
@@ -67,6 +77,7 @@ st.caption("For full heavy run, change FIXED_SUBSET_SIZE to 50,000 in this file 
 
 with st.spinner("Loading cached artifacts (or building once if missing)..."):
     engine = get_engine()
+    hnsw_engine = get_hnsw_engine(engine)
 
 summary = engine.system_summary()
 c1, c2, c3, c4 = st.columns(4)
@@ -83,7 +94,8 @@ with tabs[0]:
     search_example = st.selectbox("Example queries", options=EXAMPLE_QUERIES, index=0, key="search_example")
     search_custom = st.text_input("Or type your own query (optional)", value="", key="search_custom")
     query = search_custom.strip() if search_custom.strip() else search_example
-    model_name = st.selectbox("Select retrieval model", options=["BERT", "BM25", "Hybrid"], key="search_model")
+    model_name = st.selectbox("Select retrieval model", options=["Dense", "BM25", "Hybrid"], key="search_model")
+    dense_backend = st.selectbox("Dense backend", options=["FAISS", "HNSW"], key="search_dense_backend")
     search_top_k = int(st.slider("Top-k", min_value=1, max_value=50, value=10, key="search_top_k"))
     if model_name == "Hybrid":
         search_alpha = float(
@@ -93,26 +105,55 @@ with tabs[0]:
         search_alpha = 0.5
 
     if st.button("Run Search", use_container_width=True):
-        hits = run_selected_search(engine, model_name, query, search_top_k, search_alpha)
-        show_hits(f"{model_name} Results", hits)
+        hits = run_selected_search(engine, hnsw_engine, model_name, dense_backend, query, search_top_k, search_alpha)
+        if model_name == "Dense":
+            show_hits(f"Dense ({dense_backend}) Results", hits)
+        else:
+            show_hits(f"{model_name} Results", hits)
 
 with tabs[1]:
-    st.subheader("Same Query: BERT vs BM25 vs Hybrid")
+    st.subheader("Comparison")
     compare_example = st.selectbox("Example comparison queries", options=EXAMPLE_QUERIES, index=1, key="compare_example")
     compare_custom = st.text_input("Or type your own comparison query (optional)", value="", key="compare_custom")
     cmp_query = compare_custom.strip() if compare_custom.strip() else compare_example
     cmp_top_k = int(st.slider("Top-k", min_value=1, max_value=50, value=10, key="compare_top_k"))
     cmp_alpha = float(st.slider("Hybrid alpha", min_value=0.0, max_value=1.0, value=0.5, step=0.05, key="compare_alpha"))
+    compare_mode = st.radio(
+        "Comparison mode",
+        options=["FAISS vs HNSW", "Dense/BM25/Hybrid"],
+        horizontal=True,
+        key="compare_mode",
+    )
 
     if st.button("Run Comparison", use_container_width=True):
-        comparison = engine.comparison_for_query(cmp_query, k=cmp_top_k, alpha=cmp_alpha)
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            show_hits("BERT", comparison["bert"])
-        with col2:
-            show_hits("BM25", comparison["bm25"])
-        with col3:
-            show_hits("Hybrid", comparison["hybrid"])
+        if compare_mode == "FAISS vs HNSW":
+            comparison = hnsw_engine.compare_with_faiss(cmp_query, k=cmp_top_k)
+            metrics_df = pd.DataFrame(
+                [
+                    {
+                        "Top-k": cmp_top_k,
+                        "FAISS time (ms)": comparison["faiss_time_ms"],
+                        "HNSW time (ms)": comparison["hnsw_time_ms"],
+                        "Overlap@k": comparison["overlap_at_k"],
+                    }
+                ]
+            )
+            st.dataframe(metrics_df, use_container_width=True)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                show_hits("FAISS Dense", comparison["faiss"])
+            with col2:
+                show_hits("Custom HNSW", comparison["hnsw"])
+        else:
+            comparison = engine.comparison_for_query(cmp_query, k=cmp_top_k, alpha=cmp_alpha)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                show_hits("Dense (FAISS)", comparison["bert"])
+            with col2:
+                show_hits("BM25", comparison["bm25"])
+            with col3:
+                show_hits("Hybrid", comparison["hybrid"])
 
 with tabs[2]:
     st.subheader("Evaluation and Experiments")

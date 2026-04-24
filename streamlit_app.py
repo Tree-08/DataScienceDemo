@@ -1,11 +1,16 @@
 import pandas as pd
 import streamlit as st
 from typing import Any, Optional
-
-from retrieval_engine import SearchConfig, SemanticSearchEngine
-
+import traceback
 
 st.set_page_config(page_title="Semantic Search Engine", layout="wide")
+
+try:
+    from retrieval_engine import SearchConfig, SemanticSearchEngine
+except Exception:
+    st.error("Startup import failed in retrieval_engine.")
+    st.code(traceback.format_exc())
+    st.stop()
 
 FIXED_SUBSET_SIZE = 3_900
 FIXED_CACHE_DIR = "cache"

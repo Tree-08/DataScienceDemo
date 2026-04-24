@@ -207,18 +207,26 @@ class SemanticSearchEngine:
             loaded_meta = json.loads(index_meta_path.read_text(encoding="utf-8"))
 
         if ann_path.exists() and not self.config.force_rebuild and loaded_meta == expected_meta:
-            loaded_ann = faiss.read_index(str(ann_path))
-            if self._index_matches(loaded_ann):
-                loaded_ann.hnsw.efSearch = self.config.hnsw_ef_search
-                self.ann_index = loaded_ann
+            try:
+                loaded_ann = faiss.read_index(str(ann_path))
+                if self._index_matches(loaded_ann):
+                    loaded_ann.hnsw.efSearch = self.config.hnsw_ef_search
+                    self.ann_index = loaded_ann
+            except Exception:
+                # Rebuild if cached index is incompatible with current platform/FAISS build.
+                self.ann_index = None
         if self.ann_index is None:
             self.ann_index = self._build_ann_index()
             faiss.write_index(self.ann_index, str(ann_path))
 
         if exact_path.exists() and not self.config.force_rebuild and loaded_meta == expected_meta:
-            loaded_exact = faiss.read_index(str(exact_path))
-            if self._index_matches(loaded_exact):
-                self.exact_index = loaded_exact
+            try:
+                loaded_exact = faiss.read_index(str(exact_path))
+                if self._index_matches(loaded_exact):
+                    self.exact_index = loaded_exact
+            except Exception:
+                # Rebuild if cached index is incompatible with current platform/FAISS build.
+                self.exact_index = None
         if self.exact_index is None:
             self.exact_index = self._build_exact_index()
             faiss.write_index(self.exact_index, str(exact_path))

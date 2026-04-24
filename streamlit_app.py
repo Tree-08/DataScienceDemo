@@ -141,7 +141,9 @@ with tabs[1]:
     cmp_query = compare_custom.strip() if compare_custom.strip() else compare_example
     cmp_top_k = int(st.slider("Top-k", min_value=1, max_value=50, value=10, key="compare_top_k"))
     cmp_alpha = float(st.slider("Hybrid alpha", min_value=0.0, max_value=1.0, value=0.5, step=0.05, key="compare_alpha"))
-    compare_options = ["FAISS vs HNSW"] if REQUIRE_HNSW else (["FAISS vs HNSW", "Dense/BM25/Hybrid"] if hnsw_engine is not None else ["Dense/BM25/Hybrid"])
+    compare_options = ["Dense/BM25/Hybrid"]
+    if hnsw_engine is not None:
+        compare_options.insert(0, "FAISS vs HNSW")
     compare_mode = st.radio(
         "Comparison mode",
         options=compare_options,

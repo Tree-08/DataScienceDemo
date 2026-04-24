@@ -1,2 +1,3 @@
 build-essential
 g++
+clang

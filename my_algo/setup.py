@@ -13,6 +13,16 @@ You can then do:  import hnsw_index
 from setuptools import setup, Extension
 import pybind11
 import sys
+import os
+import shutil
+
+# Some cloud builders default to clang++ even when it's unavailable.
+# Pick an installed compiler explicitly when CXX is not already configured.
+if sys.platform != "win32" and "CXX" not in os.environ:
+    for candidate in ("g++", "clang++", "c++"):
+        if shutil.which(candidate):
+            os.environ["CXX"] = candidate
+            break
 
 # MSVC (Windows) uses different flags from GCC/Clang
 if sys.platform == "win32":

@@ -303,3 +303,46 @@ Important:
 
 We built and analyzed a semantic search system using dense retrieval, compared it with lexical BM25, and introduced a hybrid ranker with evaluation across retrieval depth, query types, and ANN-vs-Exact performance, delivered through an interactive Streamlit app.
 URL For the hosted application : https://sementicsearchengine.streamlit.app/
+
+---
+
+## 15) Streamlit Cloud HNSW Build Report (Apr 2026)
+
+### Reported failure
+
+The deployment failed while compiling the custom pybind11 extension:
+
+```text
+Failed to build hnsw_index extension.
+Command: /home/adminuser/venv/bin/python setup.py build_ext --inplace
+Exit code: 1
+error: command 'clang++' failed: No such file or directory
+```
+
+### Root cause
+
+The build environment selected `clang++`, but `clang++` was not installed on the host image.
+
+### Fix applied in this repo
+
+1. Added system build dependencies in `packages.txt`:
+  - `build-essential`
+  - `g++`
+  - `clang`
+2. Added extension build/runtime dependencies in `requirements.txt`:
+  - `pybind11`
+  - `./my_algo`
+3. Updated `my_algo/setup.py` to auto-select an available compiler (`g++`, `clang++`, or `c++`) when `CXX` is not preset.
+4. Updated `my_algo/hnsw_retriever.py` to print detailed build diagnostics (command, working directory, exit code, stdout, stderr) if extension build/import fails.
+5. Updated `streamlit_app.py` to load custom HNSW lazily and stop with explicit error text when HNSW is required but unavailable.
+
+### Redeploy checklist
+
+1. Push latest code to GitHub.
+2. In Streamlit Cloud, clear build cache and reboot/redeploy.
+3. Confirm logs show successful `hnsw_index` build/import.
+4. If it fails again, use the new detailed stdout/stderr from logs to diagnose quickly.
+
+### Optional fallback policy
+
+If strict HNSW is not required for a demo, disable strict mode in `streamlit_app.py` and fall back to FAISS. For this repo's current behavior, HNSW is treated as required in cloud deployment.

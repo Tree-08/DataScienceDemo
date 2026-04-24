@@ -235,7 +235,9 @@ For the full heavy run, switch `FIXED_SUBSET_SIZE` back to `50_000` in both `str
    Enter one query, choose one model, inspect top-k docs.
 
 2. `Comparison View`  
-   Same query across BERT vs BM25 vs Hybrid side by side.
+  Includes two modes:
+  - `Dense/BM25/Hybrid`: same query across BERT vs BM25 vs Hybrid side by side.
+  - `FAISS vs HNSW`: side-by-side dense backend comparison when custom HNSW is available.
 
 3. `Analysis Dashboard`  
    Run experiments on `N` evaluation queries and view:
@@ -346,3 +348,4 @@ The build environment selected `clang++`, but `clang++` was not installed on the
 ### Optional fallback policy
 
 If strict HNSW is not required for a demo, disable strict mode in `streamlit_app.py` and fall back to FAISS. For this repo's current behavior, HNSW is treated as required in cloud deployment.
+Even in strict HNSW setups, the Comparison View still includes the `Dense/BM25/Hybrid` analysis mode.

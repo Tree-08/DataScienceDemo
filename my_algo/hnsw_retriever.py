@@ -19,16 +19,56 @@ from typing import List, Tuple, Any
 from pathlib import Path
 import sys
 import importlib
+import subprocess
 
-# The compiled C++ extension (hnsw_index built via setup.py)
-try:
-    hnsw_index = importlib.import_module("hnsw_index")
-except ImportError:
-    # Allow importing from the repository root when extension is built inside my_algo/.
+def _load_hnsw_index():
+    """Load the native hnsw_index module, building it in-place if necessary."""
+    try:
+        return importlib.import_module("hnsw_index")
+    except ImportError:
+        pass
+
     algo_dir = Path(__file__).resolve().parent
     if str(algo_dir) not in sys.path:
         sys.path.append(str(algo_dir))
-    hnsw_index = importlib.import_module("hnsw_index")
+
+    try:
+        return importlib.import_module("hnsw_index")
+    except ImportError:
+        pass
+
+    setup_py = algo_dir / "setup.py"
+    if setup_py.exists():
+        cmd = [
+            sys.executable,
+            "setup.py",
+            "build_ext",
+            "--inplace",
+        ]
+        try:
+            subprocess.run(
+                cmd,
+                cwd=str(algo_dir),
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except Exception as exc:
+            raise ImportError(
+                "Failed to build hnsw_index extension. "
+                "Ensure build tools and pybind11 are installed."
+            ) from exc
+
+        return importlib.import_module("hnsw_index")
+
+    raise ImportError(
+        "hnsw_index extension not found and setup.py is missing; cannot build extension."
+    )
+
+
+# The compiled C++ extension (hnsw_index built via setup.py)
+hnsw_index = _load_hnsw_index()
 
 
 # ---------------------------------------------------------------------------

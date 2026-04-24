@@ -22,11 +22,12 @@ import importlib
 import subprocess
 
 def _load_hnsw_index():
-    """Load the native hnsw_index module, building it in-place if necessary."""
+    """Load hnsw_index, building it in-place when not yet available."""
+    first_error = None
     try:
         return importlib.import_module("hnsw_index")
-    except ImportError:
-        pass
+    except ImportError as exc:
+        first_error = exc
 
     algo_dir = Path(__file__).resolve().parent
     if str(algo_dir) not in sys.path:
@@ -38,33 +39,40 @@ def _load_hnsw_index():
         pass
 
     setup_py = algo_dir / "setup.py"
-    if setup_py.exists():
-        cmd = [
-            sys.executable,
-            "setup.py",
-            "build_ext",
-            "--inplace",
-        ]
-        try:
-            subprocess.run(
-                cmd,
-                cwd=str(algo_dir),
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except Exception as exc:
-            raise ImportError(
-                "Failed to build hnsw_index extension. "
-                "Ensure build tools and pybind11 are installed."
-            ) from exc
+    if not setup_py.exists():
+        raise ImportError(
+            "hnsw_index not found and setup.py missing at "
+            f"{setup_py}. Initial import error: {first_error}"
+        )
 
-        return importlib.import_module("hnsw_index")
-
-    raise ImportError(
-        "hnsw_index extension not found and setup.py is missing; cannot build extension."
+    cmd = [sys.executable, "setup.py", "build_ext", "--inplace"]
+    proc = subprocess.run(
+        cmd,
+        cwd=str(algo_dir),
+        capture_output=True,
+        text=True,
+        check=False,
     )
+    if proc.returncode != 0:
+        raise ImportError(
+            "Failed to build hnsw_index extension.\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Working directory: {algo_dir}\n"
+            f"Exit code: {proc.returncode}\n"
+            f"--- stdout ---\n{proc.stdout}\n"
+            f"--- stderr ---\n{proc.stderr}\n"
+            "Tip: ensure Linux build tools are installed (packages.txt: build-essential, g++) "
+            "and pybind11 is present in requirements.txt."
+        )
+
+    try:
+        return importlib.import_module("hnsw_index")
+    except ImportError as exc:
+        raise ImportError(
+            "hnsw_index build finished but import still failed.\n"
+            f"Import error: {exc}\n"
+            f"sys.path includes my_algo: {str(algo_dir) in sys.path}"
+        ) from exc
 
 
 # The compiled C++ extension (hnsw_index built via setup.py)

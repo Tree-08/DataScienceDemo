@@ -19,7 +19,8 @@ if sys.platform == "win32":
     extra_compile_args = ["/std:c++17", "/O2", "/EHsc"]
     extra_link_args    = []
 else:
-    extra_compile_args = ["-std=c++17", "-O3", "-march=native", "-ffast-math"]
+    # Keep flags portable for cloud/container builds.
+    extra_compile_args = ["-std=c++17", "-O3"]
     extra_link_args    = []
     if sys.platform == "darwin":
         extra_compile_args += ["-stdlib=libc++"]

@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
+from typing import Any, Optional
 
-from hnsw_search_engine import CustomHNSWSearchEngine
 from retrieval_engine import SearchConfig, SemanticSearchEngine
 
 
@@ -10,6 +10,7 @@ st.set_page_config(page_title="Semantic Search Engine", layout="wide")
 FIXED_SUBSET_SIZE = 3_900
 FIXED_CACHE_DIR = "cache"
 FIXED_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+REQUIRE_HNSW = True
 
 EXAMPLE_QUERIES = [
     "what is semantic search",
@@ -37,13 +38,16 @@ def get_engine() -> SemanticSearchEngine:
 
 
 @st.cache_resource(show_spinner=False)
-def get_hnsw_engine(_base_engine: SemanticSearchEngine) -> CustomHNSWSearchEngine:
+def get_hnsw_engine(_base_engine: SemanticSearchEngine):
+    # Lazy import prevents hard crash at module import-time on Streamlit Cloud.
+    from hnsw_search_engine import CustomHNSWSearchEngine
+
     return CustomHNSWSearchEngine.from_base_engine(_base_engine)
 
 
 def run_selected_search(
     engine: SemanticSearchEngine,
-    hnsw_engine: CustomHNSWSearchEngine,
+    hnsw_engine: Optional[Any],
     model_name: str,
     dense_backend: str,
     query: str,
@@ -51,7 +55,7 @@ def run_selected_search(
     alpha: float,
 ):
     if model_name == "Dense":
-        if dense_backend == "HNSW":
+        if dense_backend == "HNSW" and hnsw_engine is not None:
             return hnsw_engine.hnsw_search(query, k=top_k)
         return engine.semantic_search(query, k=top_k, use_exact=False)
     if model_name == "BM25":
@@ -77,7 +81,20 @@ st.caption("For full heavy run, change FIXED_SUBSET_SIZE to 50,000 in this file 
 
 with st.spinner("Loading cached artifacts (or building once if missing)..."):
     engine = get_engine()
-    hnsw_engine = get_hnsw_engine(engine)
+    hnsw_engine: Optional[Any] = None
+    hnsw_error: Optional[str] = None
+    try:
+        hnsw_engine = get_hnsw_engine(engine)
+    except Exception as exc:
+        hnsw_error = str(exc)
+
+if hnsw_engine is None:
+    if REQUIRE_HNSW:
+        st.error("Custom HNSW backend is required but failed to load.")
+        if hnsw_error:
+            st.code(hnsw_error)
+        st.stop()
+    st.warning("Custom HNSW backend unavailable; using FAISS dense retrieval instead.")
 
 summary = engine.system_summary()
 c1, c2, c3, c4 = st.columns(4)
@@ -95,7 +112,8 @@ with tabs[0]:
     search_custom = st.text_input("Or type your own query (optional)", value="", key="search_custom")
     query = search_custom.strip() if search_custom.strip() else search_example
     model_name = st.selectbox("Select retrieval model", options=["Dense", "BM25", "Hybrid"], key="search_model")
-    dense_backend = st.selectbox("Dense backend", options=["FAISS", "HNSW"], key="search_dense_backend")
+    dense_options = ["HNSW"] if REQUIRE_HNSW else (["FAISS", "HNSW"] if hnsw_engine is not None else ["FAISS"])
+    dense_backend = st.selectbox("Dense backend", options=dense_options, key="search_dense_backend")
     search_top_k = int(st.slider("Top-k", min_value=1, max_value=50, value=10, key="search_top_k"))
     if model_name == "Hybrid":
         search_alpha = float(
@@ -118,9 +136,10 @@ with tabs[1]:
     cmp_query = compare_custom.strip() if compare_custom.strip() else compare_example
     cmp_top_k = int(st.slider("Top-k", min_value=1, max_value=50, value=10, key="compare_top_k"))
     cmp_alpha = float(st.slider("Hybrid alpha", min_value=0.0, max_value=1.0, value=0.5, step=0.05, key="compare_alpha"))
+    compare_options = ["FAISS vs HNSW"] if REQUIRE_HNSW else (["FAISS vs HNSW", "Dense/BM25/Hybrid"] if hnsw_engine is not None else ["Dense/BM25/Hybrid"])
     compare_mode = st.radio(
         "Comparison mode",
-        options=["FAISS vs HNSW", "Dense/BM25/Hybrid"],
+        options=compare_options,
         horizontal=True,
         key="compare_mode",
     )

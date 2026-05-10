@@ -156,7 +156,7 @@ class HNSWRetriever:
         self,
         query_embedding: np.ndarray,
         k: int = 5,
-        ef: int = None,
+        ef: Optional[int] = None,
     ) -> List[Tuple[Any, float]]:
         """
         Return the k most similar documents for a single query.
@@ -181,7 +181,7 @@ class HNSWRetriever:
         self,
         query_embeddings: np.ndarray,
         k: int = 5,
-        ef: int = None,
+        ef: Optional[int] = None,
     ) -> List[List[Tuple[Any, float]]]:
         """
         Query multiple vectors at once.

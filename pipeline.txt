@@ -12,7 +12,7 @@ Load MS MARCO → Extract passages + queries
 
 
 
-python main.py --subset-size 50000 --eval-queries 200 --k-values 5,10,20 --top-k 10 --alpha 0.5
+python main.py --eval-queries 200 --k-values 5,10,20 --top-k 10 --alpha 0.5
 
 streamlit run streamlit_app.py
 
